@@ -14,11 +14,22 @@ import test.tecnico.test.repo.UserRepo;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepo userRepository;
+    private final UserRepo userRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    public void register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
+        if (userRepo.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("El correo ya está registrado");
+        }
+
+        if (userRepo.existsByUsuario(request.getUsername())) {
+            throw new RuntimeException("El nombre de usuario ya existe");
+        }
+
+        if(request.getPassword().length() < 6){
+            throw new RuntimeException("La contraseña no es valida");
+        }
 
         User user = User.builder()
                 .usuario(request.getUsername())
@@ -26,20 +37,20 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
 
-        userRepository.save(user);
+        userRepo.save(user);
+
+        return new AuthResponse(null, "Usuario registrado correctamente");
     }
 
     public AuthResponse login(LoginRequest request) {
-
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow();
+        User user = userRepo.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("El correo no está registrado"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new RuntimeException("La contraseña es incorrecta");
         }
 
-        String token = jwtUtil.generateToken(user.getUsuario());
-
-        return new AuthResponse(token);
+        String token = jwtUtil.generateToken(user.getEmail());
+        return new AuthResponse(token, "Inicio de sesión exitoso");
     }
 }
